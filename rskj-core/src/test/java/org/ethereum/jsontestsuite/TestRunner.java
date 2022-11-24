@@ -69,7 +69,6 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.math.BigInteger;
 import java.util.*;
-import java.util.function.Supplier;
 
 import static org.ethereum.crypto.HashUtil.toPrintableHash;
 import static org.ethereum.json.Utils.parseData;
@@ -168,7 +167,7 @@ public class TestRunner {
                         config.getActivationConfig(),
                         new RepositoryLocator(trieStore, stateRootHandler),
                         transactionExecutorFactory,
-                        config.isRemascEnabled()),
+                        config.isRemascEnabled(), false, false),
                 stateRootHandler
         );
 

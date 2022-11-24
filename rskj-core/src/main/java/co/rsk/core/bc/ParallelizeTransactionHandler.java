@@ -23,6 +23,8 @@ import org.ethereum.core.Transaction;
 import org.ethereum.db.ByteArrayWrapper;
 import org.ethereum.vm.GasCost;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.*;
 
 public class ParallelizeTransactionHandler {
@@ -31,18 +33,19 @@ public class ParallelizeTransactionHandler {
     private final Map<RskAddress, TransactionSublist> sublistOfSender;
     private final ArrayList<TransactionSublist> sublists;
 
-    public ParallelizeTransactionHandler(short numberOfSublists, long sublistGasLimit) {
+    public ParallelizeTransactionHandler(short numberOfSublists, long sequentialSublistGasLimit, long parallelSublistGasLimit) {
         this.sublistOfSender = new HashMap<>();
         this.sublistsHavingWrittenToKey = new HashMap<>();
         this.sublistsHavingReadFromKey = new HashMap<>();
         this.sublists = new ArrayList<>();
         for (short i = 0; i < numberOfSublists; i++){
-            this.sublists.add(new TransactionSublist(sublistGasLimit, false));
+            this.sublists.add(new TransactionSublist(parallelSublistGasLimit, false));
         }
-        this.sublists.add(new TransactionSublist(sublistGasLimit, true));
+        this.sublists.add(new TransactionSublist(sequentialSublistGasLimit, true));
     }
 
-    public Optional<Long> addTransaction(Transaction tx, Set<ByteArrayWrapper> newReadKeys, Set<ByteArrayWrapper> newWrittenKeys, long gasUsedByTx) {
+    public Optional<Long> addTransaction(Transaction tx, Set<ByteArrayWrapper> newReadKeys, Set<ByteArrayWrapper> newWrittenKeys, long gasUsedByTx, long blockNumber) {
+
         TransactionSublist sublistCandidate = getSublistCandidates(tx, newReadKeys, newWrittenKeys);
 
         if (!sublistHasAvailableGas(tx, sublistCandidate)) {
@@ -86,6 +89,28 @@ public class ParallelizeTransactionHandler {
             txs.addAll(sublist.getTransactions());
         }
         return txs;
+    }
+
+    public List<Short> getTxsPerSublist() {
+        List<Short> sublistSizes = new ArrayList<>();
+        for (TransactionSublist sublist: this.sublists) {
+            if (sublist.isSequential()) {
+                continue;
+            }
+            sublistSizes.add((short) sublist.getTransactions().size());
+        }
+        return sublistSizes;
+    }
+
+    public List<Long> getGasPerSublist() {
+        List<Long> sublistGas = new ArrayList<>();
+        for (TransactionSublist sublist: this.sublists) {
+            if (sublist.isSequential()) {
+                continue;
+            }
+            sublistGas.add(sublist.getGasUsed());
+        }
+        return sublistGas;
     }
 
     public short[] getTransactionsPerSublistInOrder() {
@@ -230,6 +255,19 @@ public class ParallelizeTransactionHandler {
 
     private TransactionSublist getSequentialSublist() {
         return this.sublists.get(this.sublists.size()-1);
+    }
+
+    public int getTxInSequential() {
+        return this.getSequentialSublist().getTransactions().size();
+    }
+
+    public int getTxInParallel() {
+        int transactionsInParallelSublist = 0;
+        for (int i = 0; i < this.sublists.size()-1; i++) {
+            transactionsInParallelSublist += this.sublists.get(i).getTransactions().size();
+        }
+
+        return transactionsInParallelSublist;
     }
 
     private static class TransactionSublist {

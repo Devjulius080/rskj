@@ -43,7 +43,6 @@ import org.ethereum.vm.program.invoke.ProgramInvokeFactoryImpl;
 import org.mockito.Mockito;
 
 import java.util.Map;
-import java.util.function.Supplier;
 
 /**
  * Created by Anton Nashatyrev on 29.12.2015.
@@ -89,7 +88,7 @@ class ImportLightTest {
                         config.getActivationConfig(),
                         repositoryLocator,
                         transactionExecutorFactory,
-                        config.isRemascEnabled()),
+                        config.isRemascEnabled(), false, false),
                 stateRootHandler
         );
 

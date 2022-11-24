@@ -24,6 +24,7 @@ import co.rsk.db.RepositoryLocator;
 import co.rsk.metrics.profilers.Metric;
 import co.rsk.metrics.profilers.Profiler;
 import co.rsk.metrics.profilers.ProfilerFactory;
+import co.rsk.remasc.RemascTransaction;
 import com.google.common.annotations.VisibleForTesting;
 import org.ethereum.config.Constants;
 import org.ethereum.config.blockchain.upgrades.ActivationConfig;
@@ -38,6 +39,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -60,6 +66,8 @@ public class BlockExecutor {
     private final TransactionExecutorFactory transactionExecutorFactory;
     private final ActivationConfig activationConfig;
     private boolean remascEnabled;
+    private boolean isPlay;
+    private boolean isMetrics;
 
     private final Map<Keccak256, ProgramResult> transactionResults = new ConcurrentHashMap<>();
     private boolean registerProgramResults;
@@ -68,11 +76,15 @@ public class BlockExecutor {
             ActivationConfig activationConfig,
             RepositoryLocator repositoryLocator,
             TransactionExecutorFactory transactionExecutorFactory,
-            boolean remascEnabled) {
+            boolean remascEnabled,
+            boolean isPlay,
+            boolean isMetrics) {
         this.repositoryLocator = repositoryLocator;
         this.transactionExecutorFactory = transactionExecutorFactory;
         this.activationConfig = activationConfig;
         this.remascEnabled = remascEnabled;
+        this.isPlay = isPlay;
+        this.isMetrics = isMetrics;
     }
 
     /**
@@ -263,7 +275,7 @@ public class BlockExecutor {
         if (rskip144Active || (block.getHeader().getTxExecutionSublistsEdges() != null)) {
             return executeForMiningAfterRSKIP144(block, parent, discardInvalidTxs, ignoreReadyToExecute, saveState);
         } else {
-            return executePreviousRSKIP144(null, 0, block, parent, discardInvalidTxs, ignoreReadyToExecute, saveState);
+            return executePreviousRSKIP144(null, 0, block, parent, discardInvalidTxs, ignoreReadyToExecute, saveState, true);
         }
     }
 
@@ -296,7 +308,7 @@ public class BlockExecutor {
             if (rskip144Active && block.getHeader().getTxExecutionSublistsEdges() != null) {
                 return executeParallel(programTraceProcessor, vmTraceOptions, block, parent, discardInvalidTxs, acceptInvalidTransactions, saveState);
             } else {
-                return executePreviousRSKIP144(programTraceProcessor, vmTraceOptions, block, parent, discardInvalidTxs, acceptInvalidTransactions, saveState);
+                return executePreviousRSKIP144(programTraceProcessor, vmTraceOptions, block, parent, discardInvalidTxs, acceptInvalidTransactions, saveState, false);
             }
     }
 
@@ -307,7 +319,8 @@ public class BlockExecutor {
             BlockHeader parent,
             boolean discardInvalidTxs,
             boolean acceptInvalidTransactions,
-            boolean saveState) {
+            boolean saveState,
+            boolean mining) {
         boolean vmTrace = programTraceProcessor != null;
         logger.trace("Start execute pre RSKIP144.");
         loggingApplyBlock(block);
@@ -397,6 +410,50 @@ public class BlockExecutor {
                 vmTrace ? null : track.getTrie()
 
         );
+
+        if (!isMetrics) {
+            profiler.stop(metric);
+            logger.trace("End execute pre RSKIP144.");
+            return result;
+        }
+
+        String moment;
+        if (mining) {
+            moment = "mining";
+        } else {
+            moment = "tryToConnect";
+        }
+
+        String filePath = "/home/ubuntu/output/metrics.csv";
+        Path file = Paths.get(filePath);
+
+        String playOrGenerate = "play";
+        if (!isPlay) {
+            playOrGenerate = "generate";
+        }
+
+        // bNumber, numExecutedTx, feeTotal, gasTotal
+        String header = "playOrGenerate,rskip144,moment,bNumber,numExecutedTx,feeTotal,gasTotal,numTxInSequential,numTxInParallel\r";
+
+        String data = playOrGenerate+","+activationConfig.isActive(ConsensusRule.RSKIP144, block.getNumber())+","+moment+","+
+                block.getNumber() +","+ executedTransactions.size() +","+totalPaidFees+","+ totalGasUsed+",-1,-1\r";
+
+        try {
+            FileWriter myWriter;
+
+            if (!Files.exists(file)) {
+                myWriter = new FileWriter(filePath, true);
+                myWriter.write(header);
+                myWriter.write(data);
+            } else {
+                myWriter = new FileWriter(filePath,     true);
+                myWriter.write(data);
+            }
+            myWriter.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
         profiler.stop(metric);
         logger.trace("End execute pre RSKIP144.");
         return result;
@@ -580,6 +637,75 @@ public class BlockExecutor {
                 totalBlockPaidFees,
                 vmTrace ? null : track.getTrie()
         );
+
+        if (!isMetrics) {
+            profiler.stop(metric);
+            logger.trace("End execute pre RSKIP144.");
+            return result;
+        }
+
+        String playOrGenerate = "play";
+        if (!isPlay) {
+            playOrGenerate = "generate";
+        }
+
+        String filePath = "/home/ubuntu/output/metrics.csv";
+        Path file = Paths.get(filePath);
+        int threads = Constants.getTransactionExecutionThreads();
+        String header = "playOrGenerate,rskip144,moment,bNumber,numExecutedTx,feeTotal,gasTotal,numTxInSequential,numTxInParallel";
+        for (int j = 0; j < threads; j++) {
+            header = header.concat(",thread".concat(String.valueOf(j)));
+        }
+
+        for (int j = 0; j < threads; j++) {
+            header = header.concat(",gasThread".concat(String.valueOf(j)));
+        }
+
+        header = header + "\r";
+
+        short[] txExecutionSublistsEdges = block.getHeader().getTxExecutionSublistsEdges();
+
+        String data = playOrGenerate+","+activationConfig.isActive(ConsensusRule.RSKIP144, block.getNumber())+",tryToConnect,"+
+                block.getNumber() +","+ executedTransactions.size() +","+totalPaidFees+","+ totalGasUsed+",-1,-1";
+
+        short lastNum = 0;
+        short len = 0;
+        for (short edge : txExecutionSublistsEdges) {
+            data = data.concat(","+ (edge - lastNum));
+            lastNum = edge;
+            len++;
+        }
+
+
+        if (len < threads) {
+            for (int i=0; i < threads - len; i++) {
+                data = data.concat(","+ 0);
+            }
+        }
+
+        for (int i =0; i < threads; i++) {
+            data = data.concat(','+String.valueOf(-1));
+        }
+
+        data = data + "\r";
+
+
+        try {
+            FileWriter myWriter;
+
+            if (!Files.exists(file)) {
+                myWriter = new FileWriter(filePath, true);
+                myWriter.write(header);
+                myWriter.write(data);
+            } else {
+                myWriter = new FileWriter(filePath,     true);
+                myWriter.write(data);
+            }
+            myWriter.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
         profiler.stop(metric);
         logger.trace("End executeParallel.");
         return result;
@@ -629,7 +755,8 @@ public class BlockExecutor {
         Map<Transaction, TransactionReceipt> receiptsByTx = new HashMap<>();
         Set<DataWord> deletedAccounts = new HashSet<>();
 
-        ParallelizeTransactionHandler parallelizeTransactionHandler = new ParallelizeTransactionHandler((short) Constants.getTransactionExecutionThreads(), GasCost.toGas(block.getGasLimit()));
+        //ejecucion 1 en los buckets paralelos la mitad de esto, y en el secuencial este nro para poder meter las mismas txs exactamente que tiene cada bloque de ethereum en uno de rsk paralelo
+        ParallelizeTransactionHandler parallelizeTransactionHandler = new ParallelizeTransactionHandler((short) Constants.getTransactionExecutionThreads(), GasCost.toGas(block.getGasLimit()), GasCost.toGas(block.getGasLimit())/2);
 
         int txindex = 0;
 
@@ -637,7 +764,7 @@ public class BlockExecutor {
             loggingApplyBlockToTx(block, i);
 
             int numberOfTransactions = transactionsList.size();
-            boolean isRemascTransaction = tx.isRemascTransaction(txindex, numberOfTransactions);
+            boolean isRemascTransaction = tx.isRemascTransaction(txindex, numberOfTransactions) || tx.getClass() == RemascTransaction.class;
 
             addFeesToRemascIfRemascTxAndTrack(track, totalPaidFees, isRemascTransaction);
 
@@ -662,7 +789,7 @@ public class BlockExecutor {
                 continue;
             }
 
-            Optional<Long> sublistGasAccumulated = calculateSublistGasAccumulated(readWrittenKeysTracker, parallelizeTransactionHandler, tx, isRemascTransaction, txExecutor);
+            Optional<Long> sublistGasAccumulated = calculateSublistGasAccumulated(readWrittenKeysTracker, parallelizeTransactionHandler, tx, isRemascTransaction, txExecutor, block);
 
             if (!acceptInvalidTransactions && !sublistGasAccumulated.isPresent()) {
                 if (discardIfInvalid(block, discardInvalidTxs, track, totalPaidFees, txindex, tx, numberOfTransactions, isRemascTransaction)) {
@@ -714,6 +841,64 @@ public class BlockExecutor {
                 totalPaidFees,
                 track.getTrie()
         );
+
+
+        String playOrGenerate = "play";
+        if (!isPlay) {
+            playOrGenerate = "generate";
+        }
+
+        if (!isMetrics) {
+            profiler.stop(metric);
+            logger.trace("End execute pre RSKIP144.");
+            return result;
+        }
+
+        String filePath = "/home/ubuntu/output/metrics.csv";
+        Path file = Paths.get(filePath);
+
+        int threads = Constants.getTransactionExecutionThreads();
+        String header = "playOrGenerate,rskip144,moment,bNumber,numExecutedTx,feeTotal,gasTotal,numTxInParallel,numTxInSequential";
+
+        for (int j = 0; j < threads; j++) {
+            header = header.concat(",thread".concat(String.valueOf(j)));
+        }
+
+        for (int j = 0; j < threads; j++) {
+            header = header.concat(",gasThread".concat(String.valueOf(j)));
+        }
+
+        header = header+"\r";
+
+        String data = playOrGenerate+","+activationConfig.isActive(ConsensusRule.RSKIP144, block.getNumber())+",mining,"+
+                block.getNumber() +","+ executedTransactions.size() +","+totalPaidFees+","+ gasUsedInBlock+","+ parallelizeTransactionHandler.getTxInParallel() +","+ parallelizeTransactionHandler.getTxInSequential();
+
+        List<Short> transactionsInOrder = parallelizeTransactionHandler.getTxsPerSublist();
+        for (Short txs : transactionsInOrder) {
+            data = data.concat(','+String.valueOf(txs));
+        }
+
+        List<Long> gasPerSublist = parallelizeTransactionHandler.getGasPerSublist();
+        for (Long gas : gasPerSublist) {
+            data = data.concat(','+String.valueOf(gas));
+        }
+
+        data = data+"\r";
+
+        try {
+            FileWriter myWriter;
+            if (!Files.exists(file)) {
+                myWriter = new FileWriter(filePath, true);
+                myWriter.write(header);
+            } else {
+                myWriter = new FileWriter(filePath,     true);
+            }
+            myWriter.write(data);
+            myWriter.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
         profiler.stop(metric);
         logger.trace("End executeForMining.");
         return result;
@@ -749,12 +934,12 @@ public class BlockExecutor {
         return false;
     }
 
-    private Optional<Long> calculateSublistGasAccumulated(IReadWrittenKeysTracker readWrittenKeysTracker, ParallelizeTransactionHandler parallelizeTransactionHandler, Transaction tx, boolean isRemascTransaction, TransactionExecutor txExecutor) {
+    private Optional<Long> calculateSublistGasAccumulated(IReadWrittenKeysTracker readWrittenKeysTracker, ParallelizeTransactionHandler parallelizeTransactionHandler, Transaction tx, boolean isRemascTransaction, TransactionExecutor txExecutor, Block block) {
         Optional<Long> sublistGasAccumulated;
         if (isRemascTransaction) {
             sublistGasAccumulated = parallelizeTransactionHandler.addRemascTransaction(tx, txExecutor.getGasUsed());
         } else {
-            sublistGasAccumulated = parallelizeTransactionHandler.addTransaction(tx, readWrittenKeysTracker.getThisThreadReadKeys(), readWrittenKeysTracker.getThisThreadWrittenKeys(), txExecutor.getGasUsed());
+            sublistGasAccumulated = parallelizeTransactionHandler.addTransaction(tx, readWrittenKeysTracker.getThisThreadReadKeys(), readWrittenKeysTracker.getThisThreadWrittenKeys(), txExecutor.getGasUsed(), block.getNumber());
         }
         return sublistGasAccumulated;
     }

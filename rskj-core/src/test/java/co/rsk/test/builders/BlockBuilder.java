@@ -29,9 +29,6 @@ import co.rsk.db.StateRootsStoreImpl;
 import co.rsk.peg.BridgeSupportFactory;
 import co.rsk.trie.TrieStore;
 import org.bouncycastle.util.BigIntegers;
-import org.ethereum.config.Constants;
-import org.ethereum.config.blockchain.upgrades.ActivationConfigsForTest;
-import org.ethereum.config.blockchain.upgrades.ConsensusRule;
 import org.ethereum.core.*;
 import org.ethereum.datasource.HashMapDB;
 import org.ethereum.db.BlockStore;
@@ -129,7 +126,7 @@ public class BlockBuilder {
                             new PrecompiledContracts(config, bridgeSupportFactory),
                             new BlockTxSignatureCache(new ReceivedTxSignatureCache())
                     ),
-                    config.isRemascEnabled());
+                    config.isRemascEnabled(), false, false);
             executor.executeAndFill(block, parent.getHeader());
         }
 
