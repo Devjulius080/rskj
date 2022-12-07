@@ -66,10 +66,6 @@ public abstract class CliToolRskContextAware {
         try (RskContext ctx = contextFactory.create()) {
             printInfo("{} started", cliToolName);
 
-            RskSystemProperties rskSystemProperties = ctx.getRskSystemProperties();
-
-            KeyValueDataSource.validateDbKind(rskSystemProperties.databaseKind(), rskSystemProperties.databaseDir(), rskSystemProperties.databaseReset() || rskSystemProperties.importEnabled());
-
             onExecute(args, ctx);
 
             printInfo("{} finished", cliToolName);

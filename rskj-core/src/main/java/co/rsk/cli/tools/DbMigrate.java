@@ -141,11 +141,11 @@ public class DbMigrate extends CliToolRskContextAware {
                     continue;
                 }
 
-                DbMigrationInformation dbMigrationInformation = buildDbMigrationInformation(sourceDbDir, targetDbDir, defaultDbKind, dbSourceDbKind, targetDbKind, dbName);
+                DbMigrationInformation dbMigrationInformation = buildDbMigrationInformation(sourceDbDir, targetDbDir, dbSourceDbKind, targetDbKind, dbName, ctx);
 
                 this.migrate(dbMigrationInformation);
 
-                KeyValueDataSource.validateDbKind(targetDbKind, fullTargetDbPath, true, defaultDbKind);
+                KeyValueDataSource.generatedDbKindFile(targetDbKind, fullTargetDbPath);
 
                 String nodeIdFilePath = "/" + NODE_ID_FILE;
 
@@ -157,7 +157,7 @@ public class DbMigrate extends CliToolRskContextAware {
             }
         }
 
-        KeyValueDataSource.validateDbKind(targetDbKind, targetDbDir, true);
+        KeyValueDataSource.generatedDbKindFile(targetDbKind, targetDbDir);
 
         String nodeIdFilePath = "/" + NODE_ID_FILE;
 
@@ -173,15 +173,15 @@ public class DbMigrate extends CliToolRskContextAware {
     private DbMigrationInformation buildDbMigrationInformation(
             String sourceDbDir,
             String targetDbDir,
-            DbKind defaultDbKind,
             DbKind sourceDbKind,
             DbKind targetDbKind,
-            String dbName
+            String dbName,
+            RskContext ctx
     ) {
         logger.info("Preparing data sources for db: {}", dbName);
 
-        KeyValueDataSource sourceDataSource = KeyValueDataSource.makeDataSource(Paths.get(sourceDbDir, dbName), sourceDbKind, defaultDbKind);
-        KeyValueDataSource targetDataSource = KeyValueDataSource.makeDataSource(Paths.get(targetDbDir, dbName), targetDbKind, defaultDbKind);
+        KeyValueDataSource sourceDataSource = KeyValueDataSource.makeDataSource(Paths.get(sourceDbDir, dbName), sourceDbKind, ctx.getRskSystemProperties());
+        KeyValueDataSource targetDataSource = KeyValueDataSource.makeDataSource(Paths.get(targetDbDir, dbName), targetDbKind, ctx.getRskSystemProperties());
 
         logger.info("Data sources prepared successfully");
         logger.info("Preparing indexes for db: {}", dbName);
