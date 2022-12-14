@@ -2,7 +2,6 @@ package co.rsk.cli.tools;
 
 import co.rsk.trie.TrieStore;
 import co.rsk.trie.TrieStoreImpl;
-import org.ethereum.core.Block;
 import org.ethereum.datasource.DbKind;
 import org.ethereum.datasource.KeyValueDataSource;
 import org.ethereum.datasource.KeyValueDataSourceUtils;
@@ -71,37 +70,32 @@ import java.util.Locale;
 public class MigrateState {
     private static final Logger logger = LoggerFactory.getLogger(MigrateState.class);
 
-    static int commandIdx = 0;
-    static int rootIdx = 1;
-    static int srcFilePathIdx = 2;
-    static int srcFileFormatIdx = 3;
-    static int dstPathIdx = 4;
-    static int dstFileFormatIdx = 5;
-    static int cachePathIdx = 6;
-    static int cacheFileFormatIdx = 7;
-
+    private static final int COMMAND_IDX = 0;
+    private static final int ROOT_IDX = 1;
+    private static final int SRC_FILE_PATH_IDX = 2;
+    private static final int SRC_FILE_FORMAT_IDX = 3;
+    private static final int DST_PATH_IDX = 4;
+    private static final int DST_FILE_FORMAT_IDX = 5;
+    private static final int CACHE_PATH_IDX = 6;
+    private static final int CACHE_FILE_FORMAT_IDX = 7;
 
     public static void main(String[] args) {
         new MigrateState().onExecute(args);
-
     }
 
-
-    MigrateStateUtil.Command command;
-
     protected void onExecute(@Nonnull String[] args) {
-        command = MigrateStateUtil.Command.ofName(args[commandIdx].toUpperCase(Locale.ROOT));
+        MigrateStateUtil.Command command = MigrateStateUtil.Command.ofName(args[COMMAND_IDX].toUpperCase(Locale.ROOT));
 
         TrieStore srcTrieStore = null;
         KeyValueDataSource dsDst = null;
 
-        String srcFilePath = args[srcFilePathIdx];
+        String srcFilePath = args[SRC_FILE_PATH_IDX];
         boolean readOnlySrc = (command == MigrateStateUtil.Command.CHECK) ||
                 (command == MigrateStateUtil.Command.NODEEXISTS) ||
                 (command == MigrateStateUtil.Command.VALUEEXISTS);
 
         KeyValueDataSource dsSrc;
-        DbKind srcFileFmt = DbKind.ofName(args[srcFileFormatIdx]);
+        DbKind srcFileFmt = DbKind.ofName(args[SRC_FILE_FORMAT_IDX]);
 
         dsSrc = KeyValueDataSourceUtils.makeDataSource(Paths.get(srcFilePath), srcFileFmt);
 
@@ -111,8 +105,8 @@ public class MigrateState {
         if (!readOnlySrc) {
             // Use two databases
 
-            String dstFilePath = args[dstPathIdx];
-            DbKind dstFileFmt = DbKind.ofName(args[dstFileFormatIdx]);
+            String dstFilePath = args[DST_PATH_IDX];
+            DbKind dstFileFmt = DbKind.ofName(args[DST_FILE_FORMAT_IDX]);
             dsDst = KeyValueDataSourceUtils.makeDataSource(Paths.get(dstFilePath), dstFileFmt);
             logger.info("dst path: " + dstFilePath);
             logger.info("dst format: " + dstFileFmt);
@@ -126,30 +120,30 @@ public class MigrateState {
         if ((command == MigrateStateUtil.Command.NODEEXISTS)
                 || (command == MigrateStateUtil.Command.VALUEEXISTS)) {
             logger.info("check key existence...");
-            root = Hex.decode(args[rootIdx]);
+            root = Hex.decode(args[ROOT_IDX]);
             logger.info("State key: " + Hex.toHexString(root));
             // do not migrate: check that migration is ok.
             srcTrieStore = new TrieStoreImpl(dsSrc);
         } else if (command == MigrateStateUtil.Command.CHECK) {
             logger.info("checking...");
-            root = Hex.decode(args[rootIdx]);
+            root = Hex.decode(args[ROOT_IDX]);
             logger.info("State root: " + Hex.toHexString(root));
             // do not migrate: check that migration is ok.
             srcTrieStore = new TrieStoreImpl(dsSrc);
         } else if (command == MigrateStateUtil.Command.FIX) {
             logger.info("fixing...");
-            root = Hex.decode(args[rootIdx]);
+            root = Hex.decode(args[ROOT_IDX]);
             logger.info("State root: " + Hex.toHexString(root));
             // do not migrate: check that migration is ok.
             // We iterate the trie over the new (dst) database, to make it faster
             srcTrieStore = new TrieStoreImpl(dsSrc);
         } else if (command == MigrateStateUtil.Command.COPY) {
-            String rootStr = args[rootIdx];
+            String rootStr = args[ROOT_IDX];
             if (rootStr.equalsIgnoreCase("ALL")) {
                 command = MigrateStateUtil.Command.COPYALL;
                 logger.info("copying all...");
             } else {
-                root = Hex.decode(args[rootIdx]);
+                root = Hex.decode(args[ROOT_IDX]);
                 logger.info("copying from root...");
                 logger.info("State root: " + Hex.toHexString(root));
                 srcTrieStore = new TrieStoreImpl(dsSrc);
@@ -157,16 +151,16 @@ public class MigrateState {
 
         } else if (command == MigrateStateUtil.Command.MIGRATE) {
             logger.info("migrating...");
-            root = Hex.decode(args[rootIdx]);
+            root = Hex.decode(args[ROOT_IDX]);
             srcTrieStore = new TrieStoreImpl(dsSrc);
         } else if (command == MigrateStateUtil.Command.MIGRATE2) {
             logger.info("migrating with cache...");
-            cacheFilePath = args[cachePathIdx];
-            cacheFileFmt = DbKind.ofName(args[cacheFileFormatIdx]);
+            cacheFilePath = args[CACHE_PATH_IDX];
+            cacheFileFmt = DbKind.ofName(args[CACHE_FILE_FORMAT_IDX]);
             dsCache = KeyValueDataSourceUtils.makeDataSource(Paths.get(cacheFilePath), cacheFileFmt);
             logger.info("cache path: " + cacheFilePath);
             logger.info("cache format: " + cacheFileFmt);
-            root = Hex.decode(args[rootIdx]);
+            root = Hex.decode(args[ROOT_IDX]);
             srcTrieStore = new TrieStoreImpl(dsSrc);
 
         } else {
