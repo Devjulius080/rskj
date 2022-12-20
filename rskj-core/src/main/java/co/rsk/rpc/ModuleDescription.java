@@ -28,14 +28,16 @@ public class ModuleDescription {
     private String name;
     private String version;
     private boolean enabled;
+    private int timeout;
 
     private List<String> enabledMethods;
     private List<String> disabledMethods;
 
-    public ModuleDescription(String name, String version, boolean enabled, List<String> enabledMethods, List<String> disabledMethods) {
+    public ModuleDescription(String name, String version, boolean enabled, List<String> enabledMethods, List<String> disabledMethods, int timeout) {
         this.name = name;
         this.version = version;
         this.enabled = enabled;
+        this.timeout = timeout;
         this.enabledMethods = enabledMethods == null ? new ArrayList<>() : enabledMethods;
         this.disabledMethods = disabledMethods == null ? new ArrayList<>() : disabledMethods;
     }
@@ -80,6 +82,10 @@ public class ModuleDescription {
         return true;
     }
 
+    public int getTimeout() {
+        return timeout;
+    }
+
     public boolean methodIsEnable(String methodName) {
         if (!this.isEnabled()) {
             return false;
@@ -107,4 +113,6 @@ public class ModuleDescription {
 
         return true;
     }
+
+
 }

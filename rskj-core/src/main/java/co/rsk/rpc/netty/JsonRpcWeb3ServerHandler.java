@@ -18,6 +18,7 @@
 
 package co.rsk.rpc.netty;
 
+import co.rsk.config.RskSystemProperties;
 import co.rsk.rpc.JsonRpcMethodFilter;
 import co.rsk.rpc.ModuleDescription;
 import co.rsk.util.JacksonParserUtil;
@@ -48,8 +49,8 @@ public class JsonRpcWeb3ServerHandler extends SimpleChannelInboundHandler<ByteBu
     private final JsonNodeFactory jsonNodeFactory = JsonNodeFactory.instance;
     private final JsonRpcBasicServer jsonRpcServer;
 
-    public JsonRpcWeb3ServerHandler(Web3 service, List<ModuleDescription> filteredModules) {
-        this.jsonRpcServer = new JsonRpcBasicServer(service, service.getClass());
+    public JsonRpcWeb3ServerHandler(Web3 service, List<ModuleDescription> filteredModules, RskSystemProperties rskSystemProperties) {
+        this.jsonRpcServer = new JsonRpcCustomServer(service, service.getClass(), rskSystemProperties);
         jsonRpcServer.setRequestInterceptor(new JsonRpcMethodFilter(filteredModules));
         jsonRpcServer.setErrorResolver(new MultipleErrorResolver(new RskErrorResolver(), AnnotationsErrorResolver.INSTANCE, DefaultErrorResolver.INSTANCE));
     }

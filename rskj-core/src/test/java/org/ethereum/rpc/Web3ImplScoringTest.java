@@ -408,7 +408,8 @@ class Web3ImplScoringTest {
                 null, new EthModuleWalletEnabled(wallet), null,
                 new BridgeSupportFactory(
                         null, config.getNetworkConstants().getBridgeConstants(), config.getActivationConfig()),
-                config.getGasEstimationCap()
+                config.getGasEstimationCap(),
+                config.getGasCap()
         );
         TxPoolModule tpm = new TxPoolModuleImpl(Web3Mocks.getMockTransactionPool());
         DebugModule dm = new DebugModuleImpl(null, null, Web3Mocks.getMockMessageHandler(), null, null);

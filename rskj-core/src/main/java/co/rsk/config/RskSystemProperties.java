@@ -261,6 +261,12 @@ public class RskSystemProperties extends SystemProperties {
             String name = configElement.getString("name");
             String version = configElement.getString("version");
             boolean enabled = configElement.getBoolean("enabled");
+            int timeout = 0;
+
+            if (configElement.hasPath("timeout")) {
+                timeout = configElement.getInt("timeout");
+            }
+
             List<String> enabledMethods = null;
             List<String> disabledMethods = null;
 
@@ -272,7 +278,7 @@ public class RskSystemProperties extends SystemProperties {
                 disabledMethods = configElement.getStringList("methods.disabled");
             }
 
-            modules.add(new ModuleDescription(name, version, enabled, enabledMethods, disabledMethods));
+            modules.add(new ModuleDescription(name, version, enabled, enabledMethods, disabledMethods, timeout));
         }
 
         this.moduleDescriptions = modules;

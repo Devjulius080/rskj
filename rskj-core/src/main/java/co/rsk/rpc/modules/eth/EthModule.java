@@ -72,6 +72,7 @@ public class EthModule
     private final BridgeSupportFactory bridgeSupportFactory;
     private final byte chainId;
     private final long gasEstimationCap;
+    private final long gasCap;
 
     public EthModule(
             BridgeConstants bridgeConstants,
@@ -84,7 +85,8 @@ public class EthModule
             EthModuleWallet ethModuleWallet,
             EthModuleTransaction ethModuleTransaction,
             BridgeSupportFactory bridgeSupportFactory,
-            long gasEstimationCap) {
+            long gasEstimationCap,
+            long gasCap) {
         this.chainId = chainId;
         this.blockchain = blockchain;
         this.transactionPool = transactionPool;
@@ -96,6 +98,7 @@ public class EthModule
         this.bridgeConstants = bridgeConstants;
         this.bridgeSupportFactory = bridgeSupportFactory;
         this.gasEstimationCap = gasEstimationCap;
+        this.gasCap = gasCap;
     }
 
     @Override
@@ -262,7 +265,7 @@ public class EthModule
                 executionBlock,
                 executionBlock.getCoinbase(),
                 hexArgs.getGasPrice(),
-                hexArgs.getGasLimit(),
+                hexArgs.gasLimitForCall(this.gasCap),
                 hexArgs.getToAddress(),
                 hexArgs.getValue(),
                 hexArgs.getData(),
@@ -299,7 +302,7 @@ public class EthModule
                 executionBlock,
                 executionBlock.getCoinbase(),
                 hexArgs.getGasPrice(),
-                hexArgs.getGasLimit(),
+                hexArgs.gasLimitForCall(this.gasCap),
                 hexArgs.getToAddress(),
                 hexArgs.getValue(),
                 hexArgs.getData(),
