@@ -157,8 +157,6 @@ public class DbMigrate extends CliToolRskContextAware {
             }
         }
 
-        KeyValueDataSource.generatedDbKindFile(targetDbKind, targetDbDir);
-
         String nodeIdFilePath = "/" + NODE_ID_FILE;
 
         if (new File(sourceDbDir, NODE_ID_FILE).exists()) {
